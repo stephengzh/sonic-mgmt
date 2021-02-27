@@ -39,7 +39,9 @@ reboot_ctrl_dict = {
         "command": "reboot",
         "timeout": 300,
         "wait": 120,
-        "cause": "'reboot'",
+        # We are searching two types of reboot cause.
+        # This change relates to changes of PR #6130 in sonic-buildimage repository
+        "cause": r"'reboot'|Non-Hardware \(reboot",
         "test_reboot_cause_only": False
     },
     REBOOT_TYPE_FAST: {
@@ -73,7 +75,8 @@ def get_warmboot_finalizer_state(duthost):
         finalizer_state = err.results
     return finalizer_state
 
-def reboot(duthost, localhost, reboot_type='cold', delay=10, timeout=0, wait=0, reboot_helper=None, reboot_kwargs=None):
+def reboot(duthost, localhost, reboot_type='cold', delay=10, \
+    timeout=0, wait=0, wait_for_ssh=True, reboot_helper=None, reboot_kwargs=None):
     """
     reboots DUT
     :param duthost: DUT host object
@@ -132,6 +135,9 @@ def reboot(duthost, localhost, reboot_type='cold', delay=10, timeout=0, wait=0, 
             logger.error('reboot result: {}'.format(reboot_res.get()))
         raise Exception('DUT did not shutdown')
 
+    if not wait_for_ssh:
+        return
+
     # TODO: add serial output during reboot for better debuggability
     #       This feature requires serial information to be present in
     #       testbed information
@@ -155,7 +161,7 @@ def reboot(duthost, localhost, reboot_type='cold', delay=10, timeout=0, wait=0, 
         logger.info('waiting for warmboot-finalizer service to become activating')
         finalizer_state = get_warmboot_finalizer_state(duthost)
         while finalizer_state != 'activating':
-            dut_datetime_after_ssh = duthost.get_up_time()
+            dut_datetime_after_ssh = duthost.get_now_time()
             time_passed = float(dut_datetime_after_ssh.strftime("%s")) - float(dut_datetime.strftime("%s"))
             if time_passed > wait:
                 raise Exception('warmboot-finalizer never reached state "activating"')
